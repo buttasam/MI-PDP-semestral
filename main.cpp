@@ -17,6 +17,16 @@ bool isQueen(char c) {
     return c == '3';
 }
 
+bool isBlack(char c) {
+    return c == '1';
+}
+
+
+bool isWhite(char c) {
+    return c == '2';
+}
+
+
 
 void printData(figurine &queen, char desk[][MAX_SIZE], int size) {
     cout << "Queen [" << queen.x << ", " << queen.y << "]" << endl;
@@ -31,7 +41,6 @@ void printData(figurine &queen, char desk[][MAX_SIZE], int size) {
 
 
 void readData(figurine &queen, char desk[][MAX_SIZE]) {
-
     int i = 1;
     for (string line; getline(cin, line);) {
         int j = 1;
@@ -55,7 +64,7 @@ int main(int argc, char *argv[]) {
     int blackCount, whiteCount;
     readInfo(size, maxDept);
 
-    figurine queen;
+    figurine queen{};
     char desk[MAX_SIZE][MAX_SIZE];
     readData(queen, desk);
 
