@@ -1,13 +1,22 @@
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 using namespace std;
 
 const int MAX_SIZE = 20;
 
-struct figurine {
+class Move {
+public:
+    Move() {}
+    Move(int x, int y) {
+        this->x = x;
+        this->y = y;
+    }
+
     int x, y;
 };
+
 
 void readInfo(ifstream &file, int &size, int &maxDept) {
     file >> size >> maxDept;
@@ -28,7 +37,7 @@ bool isWhite(char c) {
 }
 
 
-void printData(figurine &queen, char desk[][MAX_SIZE], int size) {
+void printData(Move &queen, char desk[][MAX_SIZE], int size) {
     cout << "Queen [" << queen.x << ", " << queen.y << "]" << endl;
 
     for (int i = 0; i < size; i++) {
@@ -40,7 +49,7 @@ void printData(figurine &queen, char desk[][MAX_SIZE], int size) {
 }
 
 
-void readData(ifstream &file, figurine &queen, char desk[][MAX_SIZE]) {
+void readData(ifstream &file, Move &queen, char desk[][MAX_SIZE]) {
     int i = 0;
     for (string line; getline(file, line);) {
         int j = 0;
@@ -58,18 +67,30 @@ void readData(ifstream &file, figurine &queen, char desk[][MAX_SIZE]) {
     }
 }
 
+
+void availableMoves(char desk[][MAX_SIZE], int size, vector<Move> deadBlackList) {
+    deadBlackList.emplace_back(1, 2);
+    cout << deadBlackList.size() << endl;
+}
+
 int main(int argc, char *argv[]) {
     ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna01.txt");
 
     // velikost hraci plochy, maximalni hloubka (omezeni), pocet bilych a cernych figurek
     int size, maxDept, blackCount, whiteCount;
-    figurine queen{};
+    Move queen;
     char desk[MAX_SIZE][MAX_SIZE];
 
     readInfo(file, size, maxDept);
     readData(file, queen, desk);
 
     printData(queen, desk, size);
+
+    vector<Move> deadBlackList;
+    availableMoves(desk, size, deadBlackList);
+
+    cout << deadBlackList.size() << endl;
+
 
     return 0;
 }
