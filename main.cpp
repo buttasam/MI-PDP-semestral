@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 
 using namespace std;
 
@@ -8,8 +9,8 @@ struct figurine {
     int x, y;
 };
 
-void readInfo(int &size, int &maxDept) {
-    cin >> size >> maxDept;
+void readInfo(ifstream &file, int &size, int &maxDept) {
+    file >> size >> maxDept;
 }
 
 
@@ -27,12 +28,11 @@ bool isWhite(char c) {
 }
 
 
-
 void printData(figurine &queen, char desk[][MAX_SIZE], int size) {
     cout << "Queen [" << queen.x << ", " << queen.y << "]" << endl;
 
-    for (int i = 1; i <= size; i++) {
-        for (int j = 1; j <= size; j++) {
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
             cout << desk[i][j];
         }
         cout << endl;
@@ -40,14 +40,15 @@ void printData(figurine &queen, char desk[][MAX_SIZE], int size) {
 }
 
 
-void readData(figurine &queen, char desk[][MAX_SIZE]) {
-    int i = 1;
-    for (string line; getline(cin, line);) {
-        int j = 1;
+void readData(ifstream &file, figurine &queen, char desk[][MAX_SIZE]) {
+    int i = 0;
+    for (string line; getline(file, line);) {
+        int j = 0;
         for (char &c : line) {
             if (isQueen(c)) {
                 queen.x = i;
                 queen.y = j;
+                desk[i][j] = '0';
             } else {
                 desk[i][j] = c;
             }
@@ -58,15 +59,15 @@ void readData(figurine &queen, char desk[][MAX_SIZE]) {
 }
 
 int main(int argc, char *argv[]) {
+    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna01.txt");
 
-    // promenne
-    int size, maxDept; // velikost hraci plochy a maximalni hloubka (omezeni)
-    int blackCount, whiteCount;
-    readInfo(size, maxDept);
-
+    // velikost hraci plochy, maximalni hloubka (omezeni), pocet bilych a cernych figurek
+    int size, maxDept, blackCount, whiteCount;
     figurine queen{};
     char desk[MAX_SIZE][MAX_SIZE];
-    readData(queen, desk);
+
+    readInfo(file, size, maxDept);
+    readData(file, queen, desk);
 
     printData(queen, desk, size);
 
