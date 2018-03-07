@@ -17,12 +17,6 @@ public:
     int x, y;
 };
 
-
-void readInfo(ifstream &file, int &size, int &maxDept) {
-    file >> size >> maxDept;
-}
-
-
 bool isQueen(char c) {
     return c == '3';
 }
@@ -36,6 +30,9 @@ bool isWhite(char c) {
     return c == '2';
 }
 
+void readInfo(ifstream &file, int &size, int &maxDept) {
+    file >> size >> maxDept;
+}
 
 void printData(Move &queen, char desk[][MAX_SIZE], int size) {
     cout << "Queen [" << queen.x << ", " << queen.y << "]" << endl;
@@ -49,11 +46,15 @@ void printData(Move &queen, char desk[][MAX_SIZE], int size) {
 }
 
 
-void readData(ifstream &file, Move &queen, char desk[][MAX_SIZE]) {
-    int i = 0;
-    for (string line; getline(file, line);) {
-        int j = 0;
-        for (char &c : line) {
+void readData(ifstream &file, Move &queen, char desk[][MAX_SIZE], int& size) {
+    string line;
+    getline(file, line); // nacteni prazdne radky
+
+    for (int i = 0; i < size; i++) {
+        getline(file, line);
+
+        for (int j = 0; j < size; j++) {
+            char c = line.at(j);
             if (isQueen(c)) {
                 queen.x = i;
                 queen.y = j;
@@ -61,16 +62,34 @@ void readData(ifstream &file, Move &queen, char desk[][MAX_SIZE]) {
             } else {
                 desk[i][j] = c;
             }
-            j++;
         }
-        i++;
     }
 }
 
+void availableMovesForDirection(Move& queen, char desk[][MAX_SIZE], int size, vector<Move>& deadBlackList, int deltaX, int deltaY) {
+    int x = queen.x + deltaX;
+    int y = queen.y + deltaY;
 
-void availableMoves(char desk[][MAX_SIZE], int size, vector<Move> deadBlackList) {
-    deadBlackList.emplace_back(1, 2);
-    cout << deadBlackList.size() << endl;
+    while(x >= 0 && y >= 0 && x < size && y < size) {
+        cout << x << "," << y << endl;
+
+        x = x + deltaX;
+        y = y + deltaY;
+
+    }
+    cout << "--------------------" << endl;
+
+}
+
+void availableMoves(Move& queen, char desk[][MAX_SIZE], int size, vector<Move> deadBlackList) {
+    availableMovesForDirection(queen, desk, size, deadBlackList, 0, 1);
+    availableMovesForDirection(queen, desk, size, deadBlackList, 1, 0);
+    availableMovesForDirection(queen, desk, size, deadBlackList, 0, -1);
+    availableMovesForDirection(queen, desk, size, deadBlackList, -1, 0);
+    availableMovesForDirection(queen, desk, size, deadBlackList, 1, 1);
+    availableMovesForDirection(queen, desk, size, deadBlackList, -1, -1);
+    availableMovesForDirection(queen, desk, size, deadBlackList, -1, 1);
+    availableMovesForDirection(queen, desk, size, deadBlackList, 1, -1);
 }
 
 int main(int argc, char *argv[]) {
@@ -82,14 +101,10 @@ int main(int argc, char *argv[]) {
     char desk[MAX_SIZE][MAX_SIZE];
 
     readInfo(file, size, maxDept);
-    readData(file, queen, desk);
-
-    printData(queen, desk, size);
+    readData(file, queen, desk, size);
 
     vector<Move> deadBlackList;
-    availableMoves(desk, size, deadBlackList);
-
-    cout << deadBlackList.size() << endl;
+    availableMoves(queen, desk, size, deadBlackList);
 
 
     return 0;
