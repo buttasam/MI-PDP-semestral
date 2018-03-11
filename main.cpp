@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <climits>
 
 using namespace std;
 
@@ -22,6 +23,10 @@ class Game {
     int size, maxDept, blackCount = 0;
     Move queen;
     char desk[MAX_SIZE][MAX_SIZE];
+
+    // reseni
+    int minMoves = INT_MAX;
+    vector<Move> minMovesPath;
 
     bool isQueen(char c) {
         return c == '3';
@@ -129,31 +134,68 @@ class Game {
     }
 
 
+    void findBestSolution() {
+
+        vector<Move> deadBlackList;
+        vector<Move> moves;
+        findSolution(queen, deadBlackList, moves);
+
+        cout << minMoves << endl;
+        for (auto &move : minMovesPath) {
+            cout << "(" << move.x << "," << move.y << ")";
+        }
+        cout << endl;
+    }
+
+
+private:
+
 // rekurzivní funkce se aplikuje na kazdy volny tah
-    void findSolution(Move& queen, vector<Move> deadBlackList) {
+    void findSolution(Move queen, vector<Move> deadBlackList, vector<Move> moves) {
+
+        // vyhod cernou
+        if(isBlack(desk[queen.x][queen.y])) {
+            deadBlackList.push_back(queen);
+        }
+
+        // neexistuje lepsi reseni pak ukoncit
+        if(!existsBetterSolution((int) moves.size(), deadBlackList)) {
+            return;
+        }
+
+        // pridej tah
+        moves.push_back(queen);
 
         // nalezene reseni?
         if(deadBlackList.size() == blackCount) {
-            // TODO
-        }
-
-        // nalezneme mozne tahy pro pozici kralovny
-        vector<Move> availableMovesList = availableMoves(queen, deadBlackList);
-
-        for (auto &move : availableMovesList) {
-            cout << move.x << " " << move.y << endl;
-
-            // vyhod cernou
-            if(isBlack(desk[move.x][move.y])) {
-                deadBlackList.push_back(move);
+            if(moves.size() < minMoves) {
+                minMoves = (int) moves.size() - 1;
+                minMovesPath = moves;
             }
+        } else {
+            // nalezneme mozne tahy pro pozici kralovny
+            vector<Move> availableMovesList = availableMoves(queen, deadBlackList);
 
-            findSolution(move,deadBlackList);
+            for (auto &move : availableMovesList) {
+                findSolution(move,deadBlackList, moves);
+            }
         }
 
     }
-};
 
+    bool existsBetterSolution(int movesCount, vector<Move>& deadBlackList) {
+        if(movesCount > maxDept) {
+            return false;
+        }
+
+        if(movesCount + (blackCount - deadBlackList.size()) >= minMoves) {
+            return false;
+        }
+
+        return true;
+    }
+
+};
 
 int main(int argc, char *argv[]) {
     ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna01.txt");
@@ -164,8 +206,9 @@ int main(int argc, char *argv[]) {
     game.readData(file);
 
     // na zacatku je vektor sebranych figur prazdny
-    vector<Move> deadBlackList;
     game.printData();
+    game.findBestSolution();
+
 
     return 0;
 }
