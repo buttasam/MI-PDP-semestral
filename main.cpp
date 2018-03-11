@@ -102,11 +102,11 @@ class Game {
                 if(!isDead(move, deadBlackList)) {
                     // pridat na zacatek
                     availableMoves.insert(availableMoves.begin(), move);
-                    break;
+                    return;
                 }
             }
             if(isWhite(desk[x][y])) {
-                break;
+                return;
             }
 
             // vloz na konec
@@ -133,6 +133,13 @@ class Game {
         return availableMoves;
     }
 
+    void printMoves(vector<Move> moves, vector<Move> deadBlackList) {
+        for (auto &move : moves) {
+            cout << "(" << move.x << "," << move.y << ")";
+        }
+        cout << deadBlackList.size() << endl;
+    }
+
 
     void findBestSolution() {
 
@@ -153,23 +160,26 @@ private:
 // rekurzivní funkce se aplikuje na kazdy volny tah
     void findSolution(Move queen, vector<Move> deadBlackList, vector<Move> moves) {
 
-        // vyhod cernou
-        if(isBlack(desk[queen.x][queen.y])) {
-            deadBlackList.push_back(queen);
-        }
-
         // neexistuje lepsi reseni pak ukoncit
         if(!existsBetterSolution((int) moves.size(), deadBlackList)) {
             return;
         }
 
+        // vyhod cernou
+        if(isBlack(desk[queen.x][queen.y]) && !isDead(queen, deadBlackList)) {
+            deadBlackList.push_back(queen);
+        }
+
         // pridej tah
         moves.push_back(queen);
+
 
         // nalezene reseni?
         if(deadBlackList.size() == blackCount) {
             if(moves.size() < minMoves) {
-                minMoves = (int) moves.size() - 1;
+                printMoves(moves, deadBlackList);
+
+                minMoves = (int) moves.size();
                 minMovesPath = moves;
             }
         } else {
@@ -198,14 +208,13 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna01.txt");
+    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna04.txt");
 
     // velikost hraci plochy, maximalni hloubka (omezeni), cernych figurek
     Game game;
     game.readInfo(file);
     game.readData(file);
 
-    // na zacatku je vektor sebranych figur prazdny
     game.printData();
     game.findBestSolution();
 
