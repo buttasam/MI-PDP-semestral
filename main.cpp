@@ -92,7 +92,7 @@ class Game {
         return false;
     }
 
-    void addAvailableMovesForDirection(vector<Move>& availableMoves, Move& queen, vector<Move>& deadBlackList, int deltaX, int deltaY) {
+    void addAvailableMovesForDirection(vector<Move>& availableMoves, Move& queen, vector<Move>& deadBlackList, int deltaX, int deltaY, int& blackCounter) {
         int x = queen.x + deltaX;
         int y = queen.y + deltaY;
 
@@ -102,6 +102,7 @@ class Game {
                 if(!isDead(move, deadBlackList)) {
                     // pridat na zacatek
                     availableMoves.insert(availableMoves.begin(), move);
+                    blackCounter++;
                     return;
                 }
             }
@@ -110,7 +111,7 @@ class Game {
             }
 
             // vloz na konec
-            availableMoves.push_back(move);
+            availableMoves.insert(availableMoves.begin() + blackCounter, move);
 
             x = x + deltaX;
             y = y + deltaY;
@@ -121,14 +122,15 @@ class Game {
 
     vector<Move> availableMoves(Move& queen, vector<Move> deadBlackList) {
         vector<Move> availableMoves;
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, 1);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, 0);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, -1);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, 0);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, 1);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, -1);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, 1);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, -1);
+        int blackCounter = 0;
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, 1, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, 0, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, -1, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, 0, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, 1, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, -1, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, 1, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, -1, blackCounter);
 
         return availableMoves;
     }
@@ -143,9 +145,17 @@ class Game {
 
     void findBestSolution() {
 
+
+        clock_t t;
+        t = clock();
+
         vector<Move> deadBlackList;
         vector<Move> moves;
         findSolution(queen, deadBlackList, moves);
+
+        t = clock() - t;
+        cout << "time: " << t << " miliseconds" << endl;
+        cout << "time: " << t*1.0/CLOCKS_PER_SEC << " seconds" << endl;
 
         cout << minMoves << endl;
         for (auto &move : minMovesPath) {
@@ -161,7 +171,7 @@ private:
     void findSolution(Move queen, vector<Move> deadBlackList, vector<Move> moves) {
 
         // neexistuje lepsi reseni pak ukoncit
-        if(!existsBetterSolution((int) moves.size(), deadBlackList)) {
+        if(!existsBetterSolution((int) moves.size(), (int) deadBlackList.size())) {
             return;
         }
 
@@ -179,7 +189,7 @@ private:
             if(moves.size() < minMoves) {
                 printMoves(moves, deadBlackList);
 
-                minMoves = (int) moves.size();
+                minMoves = (int) moves.size() - 1;
                 minMovesPath = moves;
             }
         } else {
@@ -193,12 +203,12 @@ private:
 
     }
 
-    bool existsBetterSolution(int movesCount, vector<Move>& deadBlackList) {
-        if(movesCount > maxDept) {
+    bool existsBetterSolution(int movesCount, int deadBlackCount) {
+        if(movesCount >= maxDept) {
             return false;
         }
 
-        if(movesCount + (blackCount - deadBlackList.size()) >= minMoves) {
+        if(movesCount + (blackCount - deadBlackCount) >= minMoves) {
             return false;
         }
 
@@ -208,14 +218,14 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna04.txt");
+    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna08.txt");
 
     // velikost hraci plochy, maximalni hloubka (omezeni), cernych figurek
     Game game;
     game.readInfo(file);
     game.readData(file);
 
-    game.printData();
+    //game.printData();
     game.findBestSolution();
 
 
