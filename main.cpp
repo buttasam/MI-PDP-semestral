@@ -85,9 +85,7 @@ class Game {
 
     bool isDead(Move& move, vector<Move>& deadBlackList) {
         for (auto &deadFigure : deadBlackList) {
-            if (deadFigure.x == move.x && deadFigure.y == move.y) {
-                return true;
-            }
+            if (deadFigure.x == move.x && deadFigure.y == move.y) return true;
         }
         return false;
     }
@@ -111,7 +109,8 @@ class Game {
             }
 
             // vloz na konec
-            availableMoves.insert(availableMoves.begin() + blackCounter, move);
+           // availableMoves.insert(availableMoves.begin() + blackCounter, move);
+            availableMoves.push_back(move);
 
             x = x + deltaX;
             y = y + deltaY;
@@ -120,22 +119,19 @@ class Game {
     }
 
 
-    vector<Move> availableMoves(Move& queen, vector<Move> deadBlackList) {
-        vector<Move> availableMoves;
+    void availableMoves(vector<Move>& availableMoves, Move& queen, vector<Move>& deadBlackList) {
         int blackCounter = 0;
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, 1, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, 0, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, -1, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, 0, blackCounter);
         addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, 1, blackCounter);
         addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, -1, blackCounter);
         addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, 1, blackCounter);
         addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, -1, blackCounter);
-
-        return availableMoves;
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, 1, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, 0, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, -1, blackCounter);
+        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, 0, blackCounter);
     }
 
-    void printMoves(vector<Move> moves, vector<Move> deadBlackList) {
+    void printMoves(vector<Move>& moves, vector<Move>& deadBlackList) {
         for (auto &move : moves) {
             cout << "(" << move.x << "," << move.y << ")";
         }
@@ -144,8 +140,6 @@ class Game {
 
 
     void findBestSolution() {
-
-
         clock_t t;
         t = clock();
 
@@ -168,57 +162,45 @@ class Game {
 private:
 
 // rekurzivní funkce se aplikuje na kazdy volny tah
-    void findSolution(Move queen, vector<Move> deadBlackList, vector<Move> moves) {
+    void findSolution(Move& queen, vector<Move> deadBlackList, vector<Move> moves) {
 
-        // neexistuje lepsi reseni pak ukoncit
-        if(!existsBetterSolution((int) moves.size(), (int) deadBlackList.size())) {
-            return;
-        }
+        // nalezeno optimalni reseni
+        if(minMoves == moves.size()) return;
+
+        // prekroceni hloubky
+        if(moves.size() > maxDept) return;
+
+        // uz neni mozne nalezt lepsi tah
+        if(moves.size() + (blackCount - deadBlackList.size()) > minMoves) return;
 
         // vyhod cernou
-        if(isBlack(desk[queen.x][queen.y]) && !isDead(queen, deadBlackList)) {
-            deadBlackList.push_back(queen);
-        }
+        if(isBlack(desk[queen.x][queen.y]) && !isDead(queen, deadBlackList)) deadBlackList.push_back(queen);
 
         // pridej tah
         moves.push_back(queen);
 
+        //printMoves(moves, deadBlackList);
 
         // nalezene reseni?
-        if(deadBlackList.size() == blackCount) {
-            if(moves.size() < minMoves) {
-                printMoves(moves, deadBlackList);
-
-                minMoves = (int) moves.size() - 1;
-                minMovesPath = moves;
-            }
-        } else {
-            // nalezneme mozne tahy pro pozici kralovny
-            vector<Move> availableMovesList = availableMoves(queen, deadBlackList);
-
-            for (auto &move : availableMovesList) {
-                findSolution(move,deadBlackList, moves);
-            }
+        if((deadBlackList.size() == blackCount) && (moves.size() - 1 < minMoves))  {
+            minMoves = (int) moves.size() - 1;
+            minMovesPath = moves;
+            return;
         }
 
+        // najdi vsechny mozne tahy
+        vector<Move> availableMovesList;
+        availableMoves(availableMovesList, queen, deadBlackList);
+
+        // aplikuj rekurzi na vsechny mozne tahy
+        for (auto &move : availableMovesList) {
+            findSolution(move,deadBlackList, moves);
+        }
     }
-
-    bool existsBetterSolution(int movesCount, int deadBlackCount) {
-        if(movesCount >= maxDept) {
-            return false;
-        }
-
-        if(movesCount + (blackCount - deadBlackCount) >= minMoves) {
-            return false;
-        }
-
-        return true;
-    }
-
 };
 
 int main(int argc, char *argv[]) {
-    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna08.txt");
+    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna12.txt");
 
     // velikost hraci plochy, maximalni hloubka (omezeni), cernych figurek
     Game game;
@@ -227,7 +209,6 @@ int main(int argc, char *argv[]) {
 
     //game.printData();
     game.findBestSolution();
-
 
     return 0;
 }
