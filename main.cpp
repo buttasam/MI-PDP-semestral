@@ -13,9 +13,11 @@ public:
     Move(int x, int y) {
         this->x = x;
         this->y = y;
+        printStar = false;
     }
 
     int x, y;
+    bool printStar;
 };
 
 class Game {
@@ -42,18 +44,18 @@ public:
     }
 
 
-    void readInfo(ifstream &file) {
-        file >> size >> maxDept;
+    void readInfo() {
+        cin >> size >> maxDept;
         minMoves = maxDept;
     }
 
 
-    void readData(ifstream &file) {
+    void readData() {
         string line;
-        getline(file, line); // nacteni prazdne radky
+        getline(cin, line); // nacteni prazdne radky
 
         for (int i = 0; i < size; i++) {
-            getline(file, line);
+            getline(cin, line);
 
             for (int j = 0; j < size; j++) {
                 char c = line.at(j);
@@ -156,6 +158,7 @@ public:
         cout << minMoves << endl;
         for (auto &move : minMovesPath) {
             cout << "(" << move.x << "," << move.y << ")";
+            if(move.printStar) cout << "*";
         }
         cout << endl;
     }
@@ -175,7 +178,10 @@ private:
         if (moves.size() + (blackCount - deadBlackList.size()) > minMoves) return;
 
         // vyhod cernou
-        if (isBlack(desk[queen.x][queen.y]) && !isDead(queen, deadBlackList)) deadBlackList.push_back(queen);
+        if (isBlack(desk[queen.x][queen.y]) && !isDead(queen, deadBlackList)) {
+            queen.printStar = true;
+            deadBlackList.push_back(queen);
+        }
 
         // pridej tah
         moves.push_back(queen);
@@ -201,12 +207,12 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna12.txt");
+    //ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna12.txt");
 
     // velikost hraci plochy, maximalni hloubka (omezeni), cernych figurek
     Game game;
-    game.readInfo(file);
-    game.readData(file);
+    game.readInfo();
+    game.readData();
 
     //game.printData();
     game.findBestSolution();
