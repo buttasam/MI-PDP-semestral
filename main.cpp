@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <climits>
 
 using namespace std;
 
@@ -10,6 +9,7 @@ const int MAX_SIZE = 20;
 class Move {
 public:
     Move() {}
+
     Move(int x, int y) {
         this->x = x;
         this->y = y;
@@ -19,13 +19,13 @@ public:
 };
 
 class Game {
-    public:
+public:
     int size, maxDept, blackCount = 0;
     Move queen;
     char desk[MAX_SIZE][MAX_SIZE];
 
     // reseni
-    int minMoves = INT_MAX;
+    int minMoves;
     vector<Move> minMovesPath;
 
     bool isQueen(char c) {
@@ -42,9 +42,9 @@ class Game {
     }
 
 
-
     void readInfo(ifstream &file) {
         file >> size >> maxDept;
+        minMoves = maxDept;
     }
 
 
@@ -62,7 +62,7 @@ class Game {
                     queen.y = j;
                     desk[i][j] = '0';
                 } else {
-                    if(isBlack(c)) {
+                    if (isBlack(c)) {
                         blackCount++;
                     }
                     desk[i][j] = c;
@@ -83,55 +83,57 @@ class Game {
     }
 
 
-    bool isDead(Move& move, vector<Move>& deadBlackList) {
+    bool isDead(Move &move, vector<Move> &deadBlackList) {
         for (auto &deadFigure : deadBlackList) {
             if (deadFigure.x == move.x && deadFigure.y == move.y) return true;
         }
         return false;
     }
 
-    void addAvailableMovesForDirection(vector<Move>& availableMoves, Move& queen, vector<Move>& deadBlackList, int deltaX, int deltaY, int& blackCounter) {
+    void addAvailableMovesForDirection(vector<Move> &blackMoves, vector<Move> &otherMoves, Move &queen,
+                                       vector<Move> &deadBlackList, int deltaX, int deltaY) {
         int x = queen.x + deltaX;
         int y = queen.y + deltaY;
 
-        while(x >= 0 && y >= 0 && x < size && y < size) {
-            Move move(x,y);
-            if(isBlack(desk[x][y])) {
-                if(!isDead(move, deadBlackList)) {
-                    // pridat na zacatek
-                    availableMoves.insert(availableMoves.begin(), move);
-                    blackCounter++;
-                    return;
-                }
-            }
-            if(isWhite(desk[x][y])) {
+        while (x >= 0 && y >= 0 && x < size && y < size) {
+            if (isWhite(desk[x][y])) {
                 return;
             }
 
-            // vloz na konec
-           // availableMoves.insert(availableMoves.begin() + blackCounter, move);
-            availableMoves.push_back(move);
+            Move move(x, y);
+            if (isBlack(desk[x][y])) {
+                if (!isDead(move, deadBlackList)) {
+                    // pridat na zacatek
+                    blackMoves.push_back(move);
+                    return;
+                }
+            } else {
+                otherMoves.push_back(move);
+            }
 
             x = x + deltaX;
             y = y + deltaY;
         }
-
     }
 
 
-    void availableMoves(vector<Move>& availableMoves, Move& queen, vector<Move>& deadBlackList) {
+    void availableMoves(vector<Move> &availableMoves, Move &queen, vector<Move> &deadBlackList) {
+        vector<Move> otherMoves;
         int blackCounter = 0;
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, 1, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, -1, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, 1, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, -1, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, 1, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 1, 0, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, 0, -1, blackCounter);
-        addAvailableMovesForDirection(availableMoves, queen, deadBlackList, -1, 0, blackCounter);
+        addAvailableMovesForDirection(availableMoves, otherMoves, queen, deadBlackList, 1, 1);
+        addAvailableMovesForDirection(availableMoves, otherMoves, queen, deadBlackList, -1, -1);
+        addAvailableMovesForDirection(availableMoves, otherMoves, queen, deadBlackList, -1, 1);
+        addAvailableMovesForDirection(availableMoves, otherMoves, queen, deadBlackList, 1, -1);
+        addAvailableMovesForDirection(availableMoves, otherMoves, queen, deadBlackList, 0, 1);
+        addAvailableMovesForDirection(availableMoves, otherMoves, queen, deadBlackList, 1, 0);
+        addAvailableMovesForDirection(availableMoves, otherMoves, queen, deadBlackList, 0, -1);
+        addAvailableMovesForDirection(availableMoves, otherMoves, queen, deadBlackList, -1, 0);
+
+        // reverse(otherMoves.begin(), otherMoves.end());
+        availableMoves.insert(availableMoves.end(), otherMoves.begin(), otherMoves.end());
     }
 
-    void printMoves(vector<Move>& moves, vector<Move>& deadBlackList) {
+    void printMoves(vector<Move> &moves, vector<Move> &deadBlackList) {
         for (auto &move : moves) {
             cout << "(" << move.x << "," << move.y << ")";
         }
@@ -149,7 +151,7 @@ class Game {
 
         t = clock() - t;
         cout << "time: " << t << " miliseconds" << endl;
-        cout << "time: " << t*1.0/CLOCKS_PER_SEC << " seconds" << endl;
+        cout << "time: " << t * 1.0 / CLOCKS_PER_SEC << " seconds" << endl;
 
         cout << minMoves << endl;
         for (auto &move : minMovesPath) {
@@ -162,19 +164,18 @@ class Game {
 private:
 
 // rekurzivní funkce se aplikuje na kazdy volny tah
-    void findSolution(Move& queen, vector<Move> deadBlackList, vector<Move> moves) {
-
+    void findSolution(Move &queen, vector<Move> deadBlackList, vector<Move> moves) {
         // nalezeno optimalni reseni
-        if(minMoves == moves.size()) return;
+        if (minMoves == blackCount) return;
 
         // prekroceni hloubky
-        if(moves.size() > maxDept) return;
+        if (moves.size() > maxDept) return;
 
         // uz neni mozne nalezt lepsi tah
-        if(moves.size() + (blackCount - deadBlackList.size()) > minMoves) return;
+        if (moves.size() + (blackCount - deadBlackList.size()) > minMoves) return;
 
         // vyhod cernou
-        if(isBlack(desk[queen.x][queen.y]) && !isDead(queen, deadBlackList)) deadBlackList.push_back(queen);
+        if (isBlack(desk[queen.x][queen.y]) && !isDead(queen, deadBlackList)) deadBlackList.push_back(queen);
 
         // pridej tah
         moves.push_back(queen);
@@ -182,7 +183,7 @@ private:
         //printMoves(moves, deadBlackList);
 
         // nalezene reseni?
-        if((deadBlackList.size() == blackCount) && (moves.size() - 1 < minMoves))  {
+        if ((deadBlackList.size() == blackCount) && (moves.size() - 1 < minMoves)) {
             minMoves = (int) moves.size() - 1;
             minMovesPath = moves;
             return;
@@ -194,7 +195,7 @@ private:
 
         // aplikuj rekurzi na vsechny mozne tahy
         for (auto &move : availableMovesList) {
-            findSolution(move,deadBlackList, moves);
+            findSolution(move, deadBlackList, moves);
         }
     }
 };
