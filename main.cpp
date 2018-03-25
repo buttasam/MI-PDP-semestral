@@ -186,13 +186,29 @@ private:
         // pridej tah
         moves.push_back(queen);
 
-        //printMoves(moves, deadBlackList);
+        // printMoves(moves, deadBlackList);
 
         // nalezene reseni?
-        if ((deadBlackList.size() == blackCount) && (moves.size() - 1 < minMoves)) {
-            minMoves = (int) moves.size() - 1;
-            minMovesPath = moves;
-            return;
+        if ((deadBlackList.size() == blackCount)) {
+
+            // muze byt lepsi?
+            if((moves.size() - 1 < minMoves)) {
+             // priznak zda bylo nalezeno minumum
+             bool minFound = false;
+
+             // nastav kritickou
+             #pragma omp critical
+             {
+               // znovu zkontroluj
+                if((moves.size() - 1 < minMoves)) {
+                  // nastav znovu kritickou sekci
+                    minMoves = (int) moves.size() - 1;
+                    minMovesPath = moves;
+                    minFound = true;
+                }
+             }
+             if(minFound) return;
+          }
         }
 
         // najdi vsechny mozne tahy
@@ -200,22 +216,34 @@ private:
         availableMoves(availableMovesList, queen, deadBlackList);
 
         // aplikuj rekurzi na vsechny mozne tahy
-        for (auto &move : availableMovesList) {
-            findSolution(move, deadBlackList, moves);
+        for (auto move : availableMovesList) {
+            if(moves.size() < 3) {
+              #pragma omp task
+              {
+                findSolution(move, deadBlackList, moves);
+              }
+              #pragma omp taskwait
+            } else {
+              findSolution(move, deadBlackList, moves);
+            }
         }
     }
 };
 
 int main(int argc, char *argv[]) {
-    //ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna12.txt");
+    // ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna02.txt");
 
     // velikost hraci plochy, maximalni hloubka (omezeni), cernych figurek
     Game game;
     game.readInfo();
     game.readData();
 
-    //game.printData();
-    game.findBestSolution();
+    // game.printData();
+    #pragma omp parallel
+    {
+        #pragma omp single
+        game.findBestSolution();
+    }
 
     return 0;
 }
