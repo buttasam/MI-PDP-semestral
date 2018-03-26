@@ -147,13 +147,19 @@ public:
     void findBestSolution() {
         auto start = chrono::system_clock::now();
 
-        vector<Move> deadBlackList;
-        vector<Move> moves;
-        findSolution(queen, deadBlackList, moves);
+        #pragma omp parallel
+        {
+            #pragma omp single
+            {
+              vector<Move> deadBlackList;
+              vector<Move> moves;
+              findSolution(queen, deadBlackList, moves);
+            }
+        }
 
         auto end = chrono::system_clock::now();
         auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
-        cout << elapsed / 1000.0 << endl;
+        cout << elapsed / 1000.0 << " seconds"<< endl;
 
         cout << minMoves << endl;
         for (auto &move : minMovesPath) {
@@ -226,7 +232,6 @@ private:
               findSolution(move, deadBlackList, moves);
             }
         }
-        #pragma omp taskwait
     }
 };
 
@@ -239,11 +244,7 @@ int main(int argc, char *argv[]) {
     game.readData();
 
     // game.printData();
-    #pragma omp parallel
-    {
-        #pragma omp single
-        game.findBestSolution();
-    }
+    game.findBestSolution();
 
     return 0;
 }
