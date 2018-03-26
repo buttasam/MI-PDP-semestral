@@ -199,9 +199,6 @@ private:
 
             // muze byt lepsi?
             if((moves.size() - 1 < minMoves)) {
-             // priznak zda bylo nalezeno minumum
-             bool minFound = false;
-
              // nastav kritickou
              #pragma omp critical
              {
@@ -210,10 +207,9 @@ private:
                   // nastav znovu kritickou sekci
                     minMoves = (int) moves.size() - 1;
                     minMovesPath = moves;
-                    minFound = true;
                 }
              }
-             if(minFound) return;
+             return;
           }
         }
 
