@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <chrono>
 
 using namespace std;
 
@@ -144,16 +145,15 @@ public:
 
 
     void findBestSolution() {
-        clock_t t;
-        t = clock();
+        auto start = chrono::system_clock::now();
 
         vector<Move> deadBlackList;
         vector<Move> moves;
         findSolution(queen, deadBlackList, moves);
 
-        t = clock() - t;
-        cout << "time: " << t << " miliseconds" << endl;
-        cout << "time: " << t * 1.0 / CLOCKS_PER_SEC << " seconds" << endl;
+        auto end = chrono::system_clock::now();
+        auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
+        cout << elapsed / 1000.0 << endl;
 
         cout << minMoves << endl;
         for (auto &move : minMovesPath) {
@@ -217,16 +217,16 @@ private:
 
         // aplikuj rekurzi na vsechny mozne tahy
         for (auto move : availableMovesList) {
-            if(moves.size() < 3) {
+            if(moves.size() < 2) {
               #pragma omp task
               {
                 findSolution(move, deadBlackList, moves);
               }
-              #pragma omp taskwait
             } else {
               findSolution(move, deadBlackList, moves);
             }
         }
+        #pragma omp taskwait
     }
 };
 
