@@ -3,6 +3,7 @@
 #include <vector>
 #include <chrono>
 #include <algorithm>
+#include <queue>
 
 using namespace std;
 
@@ -203,9 +204,21 @@ public:
     }
 
     void findBestSolutionDataParallel() {
-        // BFS queue
+        // pocatecni reseni
+        Solution initSolution;
+        initSolution.queenPosition = queen;
+
+        // fronta reseni
+        deque<Solution> queueSolutions;
+        queueSolutions.push_back(initSolution);
 
         // pokud je velikost queue > n
+        while(queueSolutions.size() < 50) {
+            findSolutionBFS(queueSolutions);
+        }
+
+        cout << minMoves << endl;
+
         // --> parallel for
         // jinak --> res BFS
 
@@ -213,6 +226,56 @@ public:
 
 
 private:
+
+    void findSolutionBFS(deque<Solution>& queueSolutions) {
+        // ziskej element z fronty
+        Solution lastSolution = queueSolutions.front();
+        // odeber element z fronty
+        queueSolutions.pop_front();
+
+        // nalezeno optimalni reseni
+        if (minMoves == blackCount) return;
+
+        // prekroceni hloubky
+        if (lastSolution.moves.size() > maxDept) return;
+
+        // uz neni mozne nalezt lepsi tah
+        if (lastSolution.moves.size() + (blackCount - lastSolution.deadBlackList.size()) > minMoves) return;
+
+        // vyhod cernou
+        if (isBlack(desk[lastSolution.queenPosition.x][lastSolution.queenPosition.y]) &&
+            !isDead(lastSolution.queenPosition, lastSolution.deadBlackList)) {
+            lastSolution.queenPosition.printStar = true;
+            lastSolution.deadBlackList.push_back(lastSolution.queenPosition);
+        }
+
+        // pridej tah
+        lastSolution.moves.push_back(lastSolution.queenPosition);
+
+        // printMoves(moves, deadBlackList);
+
+        // nalezene reseni? a muze byt lepsi?
+        if ((lastSolution.deadBlackList.size() == blackCount) && ((lastSolution.moves.size() - 1 < minMoves))) {
+            minMoves = (int) lastSolution.moves.size() - 1;
+            minMovesPath = lastSolution.moves;
+            return;
+        }
+
+        // najdi vsechny mozne tahy
+        vector<Move> availableMovesList;
+        availableMoves(availableMovesList, lastSolution.queenPosition, lastSolution.deadBlackList);
+
+        // aplikuj rekurzi na vsechny mozne tahy
+        for (auto move : availableMovesList) {
+            Solution foundSolution;
+            foundSolution.queenPosition = move;
+            foundSolution.moves = lastSolution.moves;
+            foundSolution.deadBlackList = lastSolution.deadBlackList;
+
+            queueSolutions.push_back(foundSolution);
+        }
+    }
+
     // rekurzivni funkce
     void findSolutionTaskParallel(Move &queen, vector<Move> deadBlackList, vector<Move> moves) {
         // nalezeno optimalni reseni
@@ -318,7 +381,7 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna07.txt");
+    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna04.txt");
 
     // velikost hraci plochy, maximalni hloubcinka (omezeni), cernych figurek
     Game game;
@@ -326,7 +389,7 @@ int main(int argc, char *argv[]) {
     game.readData(file);
 
     // game.printData();
-    game.findBestSolutionSeq();
+    game.findBestSolutionDataParallel();
 
     return 0;
 }
