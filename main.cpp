@@ -189,7 +189,7 @@ public:
         Solution initSolution;
         initSolution.queenPosition = queen;
 
-        findSolutionSeq(initSolution);
+        findSolutionSeqNormal(initSolution);
 
         auto end = chrono::system_clock::now();
         auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
@@ -215,16 +215,16 @@ public:
         queueSolutions.push_back(initSolution);
 
         // pokud je velikost queue > n
-        while(queueSolutions.size() < 50) {
+        while (queueSolutions.size() < 50) {
             findSolutionBFS(queueSolutions);
         }
 
 
         int i;
-        #pragma omp parallel for default (shared) private (i)
-        for(i = 0; i < queueSolutions.size(); i++) {
-                findSolutionSeq(queueSolutions.at(i));
-            }
+#pragma omp parallel for default (shared) private (i)
+        for (i = 0; i < queueSolutions.size(); i++) {
+            findSolutionSeqCritical(queueSolutions.at(i));
+        }
 
         auto end = chrono::system_clock::now();
         auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
@@ -245,7 +245,7 @@ public:
 
 private:
 
-    void findSolutionBFS(deque<Solution>& queueSolutions) {
+    void findSolutionBFS(deque<Solution> &queueSolutions) {
         // ziskej element z fronty
         Solution lastSolution = queueSolutions.front();
         // odeber element z fronty
@@ -353,7 +353,7 @@ private:
     }
 
     // rekurzivni funkce
-    void findSolutionSeq(Solution solution) {
+    void findSolutionSeq(Solution solution, bool critical) {
 
         // nalezeno optimalni reseni
         if (minMoves == blackCount) return;
@@ -377,10 +377,30 @@ private:
         // printMoves(moves, deadBlackList);
 
         // nalezene reseni? a muze byt lepsi?
-        if ((solution.deadBlackList.size() == blackCount) && ((solution.moves.size() - 1 < minMoves))) {
-            minMoves = (int) solution.moves.size() - 1;
-            minMovesPath = solution.moves;
-            return;
+        if (solution.deadBlackList.size() == blackCount) {
+            if (critical) {
+                // muze byt lepsi?
+                if ((solution.moves.size() - 1 < minMoves)) {
+                    // nastav kritickou
+#pragma omp critical
+                    {
+                        // znovu zkontroluj
+                        if ((solution.moves.size() - 1 < minMoves)) {
+                            // nastav znovu kritickou sekci
+                            minMoves = (int) solution.moves.size() - 1;
+                            minMovesPath = solution.moves;
+                        }
+                    }
+                    return;
+                }
+
+            } else {
+                if (solution.moves.size() - 1 < minMoves) {
+                    minMoves = (int) solution.moves.size() - 1;
+                    minMovesPath = solution.moves;
+                    return;
+                }
+            }
         }
 
         // najdi vsechny mozne tahy
@@ -391,8 +411,17 @@ private:
         for (auto move : availableMovesList) {
             solution.queenPosition = move;
 
-            findSolutionSeq(solution);
+            findSolutionSeqCritical(solution);
         }
+    }
+
+
+    void findSolutionSeqCritical(Solution &solution) {
+        findSolutionSeq(solution, true);
+    }
+
+    void findSolutionSeqNormal(Solution &solution) {
+        findSolutionSeq(solution, false);
     }
 
 
