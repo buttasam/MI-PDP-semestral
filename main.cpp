@@ -204,6 +204,8 @@ public:
     }
 
     void findBestSolutionDataParallel() {
+        auto start = chrono::system_clock::now();
+
         // pocatecni reseni
         Solution initSolution;
         initSolution.queenPosition = queen;
@@ -217,13 +219,27 @@ public:
             findSolutionBFS(queueSolutions);
         }
 
+
+        for(int i = 0; i < queueSolutions.size(); i++) {
+            findSolutionSeq(queueSolutions.at(i));
+        }
+
+        auto end = chrono::system_clock::now();
+        auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
+        cout << elapsed / 1000.0 << " seconds" << endl;
+
         cout << minMoves << endl;
-
-        // --> parallel for
-        // jinak --> res BFS
-
+        for (auto &move : minMovesPath) {
+            cout << "(" << move.x << "," << move.y << ")";
+            if (move.printStar) cout << "*";
+        }
+        cout << endl;
     }
 
+    void reset() {
+        minMoves = maxDept;
+        minMovesPath.clear();
+    }
 
 private:
 
@@ -381,7 +397,7 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna04.txt");
+    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna07.txt");
 
     // velikost hraci plochy, maximalni hloubcinka (omezeni), cernych figurek
     Game game;
@@ -389,6 +405,8 @@ int main(int argc, char *argv[]) {
     game.readData(file);
 
     // game.printData();
+    game.findBestSolutionSeq();
+    game.reset();
     game.findBestSolutionDataParallel();
 
     return 0;
