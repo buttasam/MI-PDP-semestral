@@ -220,9 +220,11 @@ public:
         }
 
 
-        for(int i = 0; i < queueSolutions.size(); i++) {
-            findSolutionSeq(queueSolutions.at(i));
-        }
+        int i;
+        #pragma omp parallel for default (shared) private (i)
+        for(i = 0; i < queueSolutions.size(); i++) {
+                findSolutionSeq(queueSolutions.at(i));
+            }
 
         auto end = chrono::system_clock::now();
         auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
@@ -397,7 +399,7 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna07.txt");
+    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna06.txt");
 
     // velikost hraci plochy, maximalni hloubcinka (omezeni), cernych figurek
     Game game;
