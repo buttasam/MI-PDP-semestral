@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #define BUFFER_LENGTH 100
+#define QUEUE_SIZE 20
 #define TAG_NEW_WORK 1 // nova prace
 #define TAG_RESULT 2 // odeslane reseni
 #define TAG_END 3 // ukonceni Slavu
@@ -249,7 +250,6 @@ public:
         minMovesPath.clear();
     }
 
-private:
 
     void findSolutionBFS(deque<Solution> &queueSolutions) {
         // ziskej element z fronty
@@ -300,6 +300,7 @@ private:
         }
     }
 
+private:
     // rekurzivni funkce
     void findSolutionTaskParallel(Move &queen, vector<Move> deadBlackList, vector<Move> moves) {
         // nalezeno optimalni reseni
@@ -511,56 +512,101 @@ int main(int argc, char **argv) {
 
     if (my_rank == 0) {
         cout << "---Master--- there are " << p << " processes " << endl;
-        cout << "qeen from file: " << game.queen.x << endl;
+        // pocatecni reseni
+        Solution solution;
+        solution.queenPosition = game.queen;
 
+        // fronta reseni
+        deque<Solution> queueSolutions;
+        queueSolutions.push_back(solution);
 
-        Solution solution = testSolution();
-        prepareDataToSend(solution, buffer, position);
-
-        for (int i = 1; i < p; i++) {
-            MPI_Send(buffer, position, MPI_PACKED, i, TAG_NEW_WORK, MPI_COMM_WORLD);
+        // napln frontu
+        while (queueSolutions.size() <= QUEUE_SIZE) {
+            game.findSolutionBFS(queueSolutions);
         }
 
+        // odesli prvni praci vsem slavum
+        for (int i = 1; i < p; i++) {
+            solution = queueSolutions.front(); // vezmi prvek z fronty
+            queueSolutions.pop_front(); // odeber prvek z fronty
+
+            prepareDataToSend(solution, buffer, position);
+            MPI_Send(buffer, position, MPI_PACKED, i, TAG_NEW_WORK, MPI_COMM_WORLD);
+            position = 0;
+
+            cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
+        }
+
+
+        // cekej na prijeti
         int result;
+        int working = p - 1;
         // prijeti reseni
-        int working = p;
-        while (working - 1 > 0) {
+        while (!queueSolutions.empty() || (working > 0)) {
             MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
-            cout << "result" << result << endl;
-            working--;
+
+            if(!queueSolutions.empty()) {
+                solution = queueSolutions.front(); // vezmi prvek z fronty
+                queueSolutions.pop_front(); // odeber prvek z fronty
+
+                prepareDataToSend(solution, buffer, position);
+                MPI_Send(buffer, position, MPI_PACKED, status.MPI_SOURCE, TAG_NEW_WORK, MPI_COMM_WORLD);
+                position = 0;
+                cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
+
+
+                //cout << "result: " << result << " queue size: " << queueSolutions.size() << endl;
+            } else {
+                working--;
+                // cout << "working put down: " << working << endl;
+            }
+        }
+
+        // posli vsem vlaknum info o ukonceni
+        for (int i = 1; i < p; i++) {
+            MPI_Send(buffer, position, MPI_PACKED, i, TAG_END, MPI_COMM_WORLD);
+            position = 0;
         }
 
 
     } else {
         cout << "---Slave--- " << my_rank << endl;
         int currentMove, queenX, queenY, deadBlackIntsSize;
+        bool isAlive = true;
 
-        position = 0;
-        MPI_Recv(buffer, BUFFER_LENGTH, MPI_PACKED, 0, TAG_NEW_WORK, MPI_COMM_WORLD, &status);
+        while(isAlive) {
+            position = 0;
+            MPI_Recv(buffer, BUFFER_LENGTH, MPI_PACKED, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-        MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenX, 1, MPI_INT, MPI_COMM_WORLD);
-        MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenY, 1, MPI_INT, MPI_COMM_WORLD);
-        MPI_Unpack(buffer, BUFFER_LENGTH, &position, &deadBlackIntsSize, 1, MPI_INT, MPI_COMM_WORLD);
+            if(status.MPI_TAG == TAG_NEW_WORK) {
+                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenX, 1, MPI_INT, MPI_COMM_WORLD);
+                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenY, 1, MPI_INT, MPI_COMM_WORLD);
+                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &deadBlackIntsSize, 1, MPI_INT, MPI_COMM_WORLD);
 
-        cout << "Queeen: " << queenX << "," << queenY << endl;
-        for (int i = 0; i < deadBlackIntsSize; i++) {
-            MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentMove, 1, MPI_INT, MPI_COMM_WORLD);
-            cout << "current: " << currentMove << endl;
+
+                // nastaveni hodnot
+                game.queen.x = queenX;
+                game.queen.y = queenY;
+
+                cout << "receaving solution: " << game.queen.x << ", " << game.queen.y << endl;
+
+                for (int i = 0; i < deadBlackIntsSize; i++) {
+                    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentMove, 1, MPI_INT, MPI_COMM_WORLD);
+                }
+
+
+                // odeslani reseni;
+                MPI_Send(&my_rank, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
+            } else if (status.MPI_TAG == TAG_END){
+                isAlive = false;
+            }
         }
-
-        // nastaveni hodnot
-        game.queen.x = queenX;
-        game.queen.y = queenY;
-
-        cout << "queen sent solution file: " << game.queen.x << endl;
-
-        // odeslani reseni;
-        MPI_Send(&my_rank, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
-
     }
 
     /* shut down MPI */
     MPI_Finalize();
+    cout << "---Ended--- " << my_rank << endl;
+
 
     return 0;
 }
