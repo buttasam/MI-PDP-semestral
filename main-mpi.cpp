@@ -190,60 +190,6 @@ public:
         cout << endl;
     }
 
-    void findBestSolutionSeq() {
-        auto start = chrono::system_clock::now();
-
-        Solution initSolution;
-        initSolution.queenPosition = queen;
-
-        findSolutionSeqNormal(initSolution);
-
-        auto end = chrono::system_clock::now();
-        auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
-        cout << elapsed / 1000.0 << " seconds" << endl;
-
-        cout << minMoves << endl;
-        for (auto &move : minMovesPath) {
-            cout << "(" << move.x << "," << move.y << ")";
-            if (move.printStar) cout << "*";
-        }
-        cout << endl;
-    }
-
-    void findBestSolutionDataParallel() {
-        auto start = chrono::system_clock::now();
-
-        // pocatecni reseni
-        Solution initSolution;
-        initSolution.queenPosition = queen;
-
-        // fronta reseni
-        deque<Solution> queueSolutions;
-        queueSolutions.push_back(initSolution);
-
-        // pokud je velikost queue > n
-        while (queueSolutions.size() < 50) {
-            findSolutionBFS(queueSolutions);
-        }
-
-
-        int i;
-#pragma omp parallel for default (shared) private (i)
-        for (i = 0; i < queueSolutions.size(); i++) {
-            findSolutionSeqCritical(queueSolutions.at(i));
-        }
-
-        auto end = chrono::system_clock::now();
-        auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
-        cout << elapsed / 1000.0 << " seconds" << endl;
-
-        cout << minMoves << endl;
-        for (auto &move : minMovesPath) {
-            cout << "(" << move.x << "," << move.y << ")";
-            if (move.printStar) cout << "*";
-        }
-        cout << endl;
-    }
 
     void reset() {
         minMoves = maxDept;
@@ -544,6 +490,8 @@ int main(int argc, char **argv) {
         // prijeti reseni
         while (!queueSolutions.empty() || (working > 0)) {
             MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
+            cout << "result: " << result << " queue size: " << queueSolutions.size() << endl;
+
 
             if(!queueSolutions.empty()) {
                 solution = queueSolutions.front(); // vezmi prvek z fronty
@@ -555,7 +503,6 @@ int main(int argc, char **argv) {
                 cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
 
 
-                //cout << "result: " << result << " queue size: " << queueSolutions.size() << endl;
             } else {
                 working--;
                 // cout << "working put down: " << working << endl;
@@ -594,9 +541,11 @@ int main(int argc, char **argv) {
                     MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentMove, 1, MPI_INT, MPI_COMM_WORLD);
                 }
 
+                // vypocet reseni
+                game.findBestSolutionTaskParallel();
 
                 // odeslani reseni;
-                MPI_Send(&my_rank, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
+                MPI_Send(&game.minMoves, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
             } else if (status.MPI_TAG == TAG_END){
                 isAlive = false;
             }
