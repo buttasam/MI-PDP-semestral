@@ -435,6 +435,68 @@ Solution testSolution() {
     return solution;
 }
 
+void sendEnding(int& processCount, char *buffer, int &position) {
+    for (int i = 1; i < processCount; i++) {
+        MPI_Send(buffer, position, MPI_PACKED, i, TAG_END, MPI_COMM_WORLD);
+        position = 0;
+    }
+}
+
+void sendInitDataToSlaves(deque<Solution>& queueSolutions, int& processCount, Game& game, char *buffer, int &position) {
+    cout << "---Master--- there are " << processCount << " processes " << endl;
+    // pocatecni reseni
+    Solution solution;
+    solution.queenPosition = game.queen;
+
+    // fronta reseni
+    queueSolutions.push_back(solution);
+
+    // napln frontu
+    while (queueSolutions.size() <= QUEUE_SIZE) {
+        game.findSolutionBFS(queueSolutions);
+    }
+
+    // odesli prvni praci vsem slavum
+    for (int i = 1; i < processCount; i++) {
+        solution = queueSolutions.front(); // vezmi prvek z fronty
+        queueSolutions.pop_front(); // odeber prvek z fronty
+
+        prepareDataToSend(solution, buffer, position);
+        MPI_Send(buffer, position, MPI_PACKED, i, TAG_NEW_WORK, MPI_COMM_WORLD);
+        position = 0;
+
+        cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
+    }
+}
+
+
+void processResults(deque<Solution>& queueSolutions, int& processCount, char *buffer, int &position) {
+    MPI_Status status;
+    int result;
+    int working = processCount - 1;
+    // prijeti reseni
+    while (!queueSolutions.empty() || (working > 0)) {
+        MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
+        cout << "result: " << result << " queue size: " << queueSolutions.size() << endl;
+
+
+        if(!queueSolutions.empty()) {
+            Solution solution = queueSolutions.front(); // vezmi prvek z fronty
+            queueSolutions.pop_front(); // odeber prvek z fronty
+
+            prepareDataToSend(solution, buffer, position);
+            MPI_Send(buffer, position, MPI_PACKED, status.MPI_SOURCE, TAG_NEW_WORK, MPI_COMM_WORLD);
+            position = 0;
+            cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
+
+
+        } else {
+            working--;
+            // cout << "working put down: " << working << endl;
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     int my_rank, p;
     MPI_Status status;
@@ -457,65 +519,17 @@ int main(int argc, char **argv) {
     game.readData(file);
 
     if (my_rank == 0) {
-        cout << "---Master--- there are " << p << " processes " << endl;
-        // pocatecni reseni
-        Solution solution;
-        solution.queenPosition = game.queen;
-
         // fronta reseni
         deque<Solution> queueSolutions;
-        queueSolutions.push_back(solution);
 
-        // napln frontu
-        while (queueSolutions.size() <= QUEUE_SIZE) {
-            game.findSolutionBFS(queueSolutions);
-        }
+        // odeslani slavum
+        sendInitDataToSlaves(queueSolutions, p, game, buffer, position);
 
-        // odesli prvni praci vsem slavum
-        for (int i = 1; i < p; i++) {
-            solution = queueSolutions.front(); // vezmi prvek z fronty
-            queueSolutions.pop_front(); // odeber prvek z fronty
-
-            prepareDataToSend(solution, buffer, position);
-            MPI_Send(buffer, position, MPI_PACKED, i, TAG_NEW_WORK, MPI_COMM_WORLD);
-            position = 0;
-
-            cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
-        }
-
-
-        // cekej na prijeti
-        int result;
-        int working = p - 1;
-        // prijeti reseni
-        while (!queueSolutions.empty() || (working > 0)) {
-            MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
-            cout << "result: " << result << " queue size: " << queueSolutions.size() << endl;
-
-
-            if(!queueSolutions.empty()) {
-                solution = queueSolutions.front(); // vezmi prvek z fronty
-                queueSolutions.pop_front(); // odeber prvek z fronty
-
-                prepareDataToSend(solution, buffer, position);
-                MPI_Send(buffer, position, MPI_PACKED, status.MPI_SOURCE, TAG_NEW_WORK, MPI_COMM_WORLD);
-                position = 0;
-                cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
-
-
-            } else {
-                working--;
-                // cout << "working put down: " << working << endl;
-            }
-        }
+        // cekej na prijeti a posilani nove prace slavum
+        processResults(queueSolutions, p, buffer, position);
 
         // posli vsem vlaknum info o ukonceni
-        for (int i = 1; i < p; i++) {
-            MPI_Send(buffer, position, MPI_PACKED, i, TAG_END, MPI_COMM_WORLD);
-            position = 0;
-        }
-
-
+        sendEnding(p, buffer, position);
     } else {
         cout << "---Slave--- " << my_rank << endl;
         int currentMove, queenX, queenY, deadBlackIntsSize;
@@ -555,7 +569,6 @@ int main(int argc, char **argv) {
     /* shut down MPI */
     MPI_Finalize();
     cout << "---Ended--- " << my_rank << endl;
-
 
     return 0;
 }
