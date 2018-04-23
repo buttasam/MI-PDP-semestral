@@ -166,28 +166,16 @@ public:
 
 
     void findBestSolutionTaskParallel() {
-        auto start = chrono::system_clock::now();
 
-#pragma omp parallel
+        #pragma omp parallel
         {
-#pragma omp single
+            #pragma omp single
             {
                 vector<Move> deadBlackList;
                 vector<Move> moves;
                 findSolutionTaskParallel(queen, deadBlackList, moves);
             }
         }
-
-        auto end = chrono::system_clock::now();
-        auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
-        cout << elapsed / 1000.0 << " seconds" << endl;
-
-        cout << minMoves << endl;
-        for (auto &move : minMovesPath) {
-            cout << "(" << move.x << "," << move.y << ")";
-            if (move.isBlack) cout << "*";
-        }
-        cout << endl;
     }
 
 
@@ -275,7 +263,7 @@ private:
             // muze byt lepsi?
             if ((moves.size() - 1 < minMoves)) {
                 // nastav kritickou
-#pragma omp critical
+                #pragma omp critical
                 {
                     // znovu zkontroluj
                     if ((moves.size() - 1 < minMoves)) {
@@ -295,7 +283,7 @@ private:
         // aplikuj rekurzi na vsechny mozne tahy
         for (auto move : availableMovesList) {
             if (moves.size() < 2) {
-#pragma omp task
+                #pragma omp task
                 {
                     findSolutionTaskParallel(move, deadBlackList, moves);
                 }
@@ -335,7 +323,7 @@ private:
                 // muze byt lepsi?
                 if ((solution.moves.size() - 1 < minMoves)) {
                     // nastav kritickou
-#pragma omp critical
+                    #pragma omp critical
                     {
                         // znovu zkontroluj
                         if ((solution.moves.size() - 1 < minMoves)) {
@@ -402,28 +390,6 @@ void prepareDataToSend(Solution &solution, Game &game, int *buffer, int &positio
     }
 }
 
-Solution testSolution() {
-    Solution solution;
-
-    vector<Move> deadBlack;
-    Move d1(4, 2);
-    Move d2(8, 3);
-    deadBlack.push_back(d1);
-    deadBlack.push_back(d2);
-
-    vector<Move> moves;
-    Move m1(1, 2);
-    Move m2(3, 4);
-    moves.push_back(m1);
-    moves.push_back(m2);
-
-    solution.moves = moves;
-    solution.deadBlackList = deadBlack;
-    Move move1(7, 8);
-    solution.queenPosition = move1;
-
-    return solution;
-}
 
 void sendEnding(int& processCount, int *buffer, int &position) {
     for (int i = 1; i < processCount; i++) {
@@ -535,21 +501,32 @@ int main(int argc, char **argv) {
                 // nastaveni hodnot
                 game.queen.x = queenX;
                 game.queen.y = queenY;
+                game.minMoves = minMoves;
 
                 cout << "min moves: " << minMoves << endl;
                 cout << "receaving solution: " << game.queen.x << ", " << game.queen.y << endl;
                 cout << "moves count: " << movesCount << endl;
 
                 int currentX, currentY, currentIsBlack;
+                vector<Move> moves;
+                vector<Move> deadBlackList;
                 for (int i = 0; i < movesCount; i++) {
                     MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentX, 1, MPI_INT, MPI_COMM_WORLD);
                     MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentY, 1, MPI_INT, MPI_COMM_WORLD);
                     MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentIsBlack, 1, MPI_INT, MPI_COMM_WORLD);
                     cout << "current: " << currentX << "," << currentY << "," << currentIsBlack << endl;
+
+                    if(currentIsBlack) {
+                        Move black(currentX, currentY);
+                        deadBlackList.push_back(black);
+                    }
+
+                    Move m(currentX, currentY);
+                    moves.push_back(m);
                 }
 
                 // vypocet reseni
-                // game.findBestSolutionTaskParallel();
+                game.findBestSolutionTaskParallel();
 
                 // odeslani reseni;
                 MPI_Send(&game.minMoves, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
