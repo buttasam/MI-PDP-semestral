@@ -380,36 +380,25 @@ private:
 };
 
 
-int *movesVector2Ints(vector<Move> &moves, int &size) {
-    size = 2 * moves.size();
-    int *array = new int[size];
-
-    for (int i = 0; i < moves.size(); i += 1) {
-        array[2 * i] = moves.at(i).x;
-        array[2 * i + 1] = moves.at(i).y;
-    }
-
-    return array;
-}
-
-
-void prepareDataToSend(Solution &solution, int *buffer, int &position) {
-    // deadBlack list
-    int deadBlackIntsSize = 0;
-    int *deadBlackInts = movesVector2Ints(solution.deadBlackList, deadBlackIntsSize);
+void prepareDataToSend(Solution &solution, Game &game, int *buffer, int &position) {
+    int movesCount = (int) solution.moves.size() - 1;
 
     position = 0;
+    // nejlepsi nalezene reseni
+    MPI_Pack(&game.minMoves, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
     // x souradnice kralovny
     MPI_Pack(&solution.queenPosition.x, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
     // y souradnice kralovny
     MPI_Pack(&solution.queenPosition.y, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
 
-    // deadBlack slist size
-    MPI_Pack(&deadBlackIntsSize, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
+    // velikost moves
+    MPI_Pack(&movesCount, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
 
     // deadBlack list
-    for (int i = 0; i < deadBlackIntsSize; i++) {
-        MPI_Pack(&deadBlackInts[i], 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
+    for (int i = 1; i <= movesCount; i++) {
+        MPI_Pack(&solution.moves[i].x, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
+        MPI_Pack(&solution.moves[i].y, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
+        MPI_Pack(&solution.moves[i].isBlack, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
     }
 }
 
@@ -461,7 +450,7 @@ void sendInitDataToSlaves(deque<Solution>& queueSolutions, int& processCount, Ga
         solution = queueSolutions.front(); // vezmi prvek z fronty
         queueSolutions.pop_front(); // odeber prvek z fronty
 
-        prepareDataToSend(solution, buffer, position);
+        prepareDataToSend(solution, game, buffer, position);
         MPI_Send(buffer, position, MPI_PACKED, i, TAG_NEW_WORK, MPI_COMM_WORLD);
 
         cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
@@ -469,7 +458,7 @@ void sendInitDataToSlaves(deque<Solution>& queueSolutions, int& processCount, Ga
 }
 
 
-void processResults(deque<Solution>& queueSolutions, int& processCount, int *buffer, int &position) {
+void processResults(deque<Solution>& queueSolutions, Game &game, int& processCount, int *buffer, int &position) {
     MPI_Status status;
     int result;
     int working = processCount - 1;
@@ -483,14 +472,13 @@ void processResults(deque<Solution>& queueSolutions, int& processCount, int *buf
             Solution solution = queueSolutions.front(); // vezmi prvek z fronty
             queueSolutions.pop_front(); // odeber prvek z fronty
 
-            prepareDataToSend(solution, buffer, position);
+            prepareDataToSend(solution, game, buffer, position);
             MPI_Send(buffer, position, MPI_PACKED, status.MPI_SOURCE, TAG_NEW_WORK, MPI_COMM_WORLD);
             position = 0;
             cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
 
         } else {
             working--;
-            // cout << "working put down: " << working << endl;
         }
     }
 }
@@ -524,13 +512,13 @@ int main(int argc, char **argv) {
         sendInitDataToSlaves(queueSolutions, p, game, buffer, position);
 
         // cekej na prijeti a posilani nove prace slavum
-        processResults(queueSolutions, p, buffer, position);
+        processResults(queueSolutions, game, p, buffer, position);
 
         // posli vsem vlaknum info o ukonceni
         sendEnding(p, buffer, position);
     } else {
         cout << "---Slave--- " << my_rank << endl;
-        int currentMove, queenX, queenY, deadBlackIntsSize;
+        int minMoves, currentMove, queenX, queenY, movesCount;
         bool isAlive = true;
 
         while(isAlive) {
@@ -539,23 +527,29 @@ int main(int argc, char **argv) {
             if(status.MPI_TAG == TAG_NEW_WORK) {
                 position = 0;
 
+                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &minMoves, 1, MPI_INT, MPI_COMM_WORLD);
                 MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenX, 1, MPI_INT, MPI_COMM_WORLD);
                 MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenY, 1, MPI_INT, MPI_COMM_WORLD);
-                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &deadBlackIntsSize, 1, MPI_INT, MPI_COMM_WORLD);
-
+                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &movesCount, 1, MPI_INT, MPI_COMM_WORLD);
 
                 // nastaveni hodnot
                 game.queen.x = queenX;
                 game.queen.y = queenY;
 
+                cout << "min moves: " << minMoves << endl;
                 cout << "receaving solution: " << game.queen.x << ", " << game.queen.y << endl;
+                cout << "moves count: " << movesCount << endl;
 
-                for (int i = 0; i < deadBlackIntsSize; i++) {
-                    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentMove, 1, MPI_INT, MPI_COMM_WORLD);
+                int currentX, currentY, currentIsBlack;
+                for (int i = 0; i < movesCount; i++) {
+                    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentX, 1, MPI_INT, MPI_COMM_WORLD);
+                    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentY, 1, MPI_INT, MPI_COMM_WORLD);
+                    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentIsBlack, 1, MPI_INT, MPI_COMM_WORLD);
+                    cout << "current: " << currentX << "," << currentY << "," << currentIsBlack << endl;
                 }
 
                 // vypocet reseni
-                game.findBestSolutionTaskParallel();
+                // game.findBestSolutionTaskParallel();
 
                 // odeslani reseni;
                 MPI_Send(&game.minMoves, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
