@@ -26,11 +26,11 @@ public:
     Move(int x, int y) {
         this->x = x;
         this->y = y;
-        printStar = false;
+        isBlack = false;
     }
 
     int x, y;
-    bool printStar;
+    bool isBlack;
 };
 
 class Solution {
@@ -185,7 +185,7 @@ public:
         cout << minMoves << endl;
         for (auto &move : minMovesPath) {
             cout << "(" << move.x << "," << move.y << ")";
-            if (move.printStar) cout << "*";
+            if (move.isBlack) cout << "*";
         }
         cout << endl;
     }
@@ -215,7 +215,7 @@ public:
         // vyhod cernou
         if (isBlack(desk[lastSolution.queenPosition.x][lastSolution.queenPosition.y]) &&
             !isDead(lastSolution.queenPosition, lastSolution.deadBlackList)) {
-            lastSolution.queenPosition.printStar = true;
+            lastSolution.queenPosition.isBlack = true;
             lastSolution.deadBlackList.push_back(lastSolution.queenPosition);
         }
 
@@ -260,7 +260,7 @@ private:
 
         // vyhod cernou
         if (isBlack(desk[queen.x][queen.y]) && !isDead(queen, deadBlackList)) {
-            queen.printStar = true;
+            queen.isBlack = true;
             deadBlackList.push_back(queen);
         }
 
@@ -320,7 +320,7 @@ private:
         // vyhod cernou
         if (isBlack(desk[solution.queenPosition.x][solution.queenPosition.y]) &&
             !isDead(solution.queenPosition, solution.deadBlackList)) {
-            solution.queenPosition.printStar = true;
+            solution.queenPosition.isBlack = true;
             solution.deadBlackList.push_back(solution.queenPosition);
         }
 
@@ -393,11 +393,12 @@ int *movesVector2Ints(vector<Move> &moves, int &size) {
 }
 
 
-void prepareDataToSend(Solution &solution, char *buffer, int &position) {
+void prepareDataToSend(Solution &solution, int *buffer, int &position) {
     // deadBlack list
     int deadBlackIntsSize = 0;
     int *deadBlackInts = movesVector2Ints(solution.deadBlackList, deadBlackIntsSize);
 
+    position = 0;
     // x souradnice kralovny
     MPI_Pack(&solution.queenPosition.x, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
     // y souradnice kralovny
@@ -435,14 +436,13 @@ Solution testSolution() {
     return solution;
 }
 
-void sendEnding(int& processCount, char *buffer, int &position) {
+void sendEnding(int& processCount, int *buffer, int &position) {
     for (int i = 1; i < processCount; i++) {
         MPI_Send(buffer, position, MPI_PACKED, i, TAG_END, MPI_COMM_WORLD);
-        position = 0;
     }
 }
 
-void sendInitDataToSlaves(deque<Solution>& queueSolutions, int& processCount, Game& game, char *buffer, int &position) {
+void sendInitDataToSlaves(deque<Solution>& queueSolutions, int& processCount, Game& game, int *buffer, int &position) {
     cout << "---Master--- there are " << processCount << " processes " << endl;
     // pocatecni reseni
     Solution solution;
@@ -463,14 +463,13 @@ void sendInitDataToSlaves(deque<Solution>& queueSolutions, int& processCount, Ga
 
         prepareDataToSend(solution, buffer, position);
         MPI_Send(buffer, position, MPI_PACKED, i, TAG_NEW_WORK, MPI_COMM_WORLD);
-        position = 0;
 
         cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
     }
 }
 
 
-void processResults(deque<Solution>& queueSolutions, int& processCount, char *buffer, int &position) {
+void processResults(deque<Solution>& queueSolutions, int& processCount, int *buffer, int &position) {
     MPI_Status status;
     int result;
     int working = processCount - 1;
@@ -489,7 +488,6 @@ void processResults(deque<Solution>& queueSolutions, int& processCount, char *bu
             position = 0;
             cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
 
-
         } else {
             working--;
             // cout << "working put down: " << working << endl;
@@ -500,7 +498,7 @@ void processResults(deque<Solution>& queueSolutions, int& processCount, char *bu
 int main(int argc, char **argv) {
     int my_rank, p;
     MPI_Status status;
-    char buffer[BUFFER_LENGTH];
+    int buffer[BUFFER_LENGTH];
     int position = 0;
 
     /* start up MPI */
@@ -536,10 +534,11 @@ int main(int argc, char **argv) {
         bool isAlive = true;
 
         while(isAlive) {
-            position = 0;
             MPI_Recv(buffer, BUFFER_LENGTH, MPI_PACKED, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
             if(status.MPI_TAG == TAG_NEW_WORK) {
+                position = 0;
+
                 MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenX, 1, MPI_INT, MPI_COMM_WORLD);
                 MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenY, 1, MPI_INT, MPI_COMM_WORLD);
                 MPI_Unpack(buffer, BUFFER_LENGTH, &position, &deadBlackIntsSize, 1, MPI_INT, MPI_COMM_WORLD);
