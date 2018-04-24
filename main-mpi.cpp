@@ -96,13 +96,13 @@ public:
     }
 
     void printData() {
-        cout << "Queen [" << queen.x << ", " << queen.y << "]" << endl;
+        // cout<< "Queen [" << queen.x << ", " << queen.y << "]" << endl;
 
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
-                cout << desk[i][j];
+                // cout<< desk[i][j];
             }
-            cout << endl;
+            // cout<< endl;
         }
     }
 
@@ -159,9 +159,9 @@ public:
 
     void printMoves(vector<Move> &moves, vector<Move> &deadBlackList) {
         for (auto &move : moves) {
-            cout << "(" << move.x << "," << move.y << ")";
+            // cout<< "(" << move.x << "," << move.y << ")";
         }
-        cout << deadBlackList.size() << endl;
+        // cout<< deadBlackList.size() << endl;
     }
 
 
@@ -211,8 +211,8 @@ public:
         // printMoves(moves, deadBlackList);
 
         // nalezene reseni? a muze byt lepsi?
-        if ((lastSolution.deadBlackList.size() == blackCount) && ((lastSolution.moves.size() - 1 < minMoves))) {
-            minMoves = (int) lastSolution.moves.size() - 1;
+        if ((lastSolution.deadBlackList.size() == blackCount) && ((lastSolution.moves.size() < minMoves))) {
+            minMoves = (int) lastSolution.moves.size();
             minMovesPath = lastSolution.moves;
             return;
         }
@@ -259,14 +259,14 @@ private:
         if ((deadBlackList.size() == blackCount)) {
 
             // muze byt lepsi?
-            if ((moves.size() - 1 < minMoves)) {
+            if ((moves.size() < minMoves)) {
                 // nastav kritickou
 #pragma omp critical
                 {
                     // znovu zkontroluj
-                    if ((moves.size() - 1 < minMoves)) {
+                    if ((moves.size() < minMoves)) {
                         // nastav znovu kritickou sekci
-                        minMoves = (int) moves.size() - 1;
+                        minMoves = (int) moves.size();
                         minMovesPath = moves;
                     }
                 }
@@ -319,14 +319,14 @@ private:
         if (solution.deadBlackList.size() == blackCount) {
             if (critical) {
                 // muze byt lepsi?
-                if ((solution.moves.size() - 1 < minMoves)) {
+                if ((solution.moves.size() < minMoves)) {
                     // nastav kritickou
                     #pragma omp critical
                     {
                         // znovu zkontroluj
-                        if ((solution.moves.size() - 1 < minMoves)) {
+                        if ((solution.moves.size() < minMoves)) {
                             // nastav znovu kritickou sekci
-                            minMoves = (int) solution.moves.size() - 1;
+                            minMoves = (int) solution.moves.size();
                             minMovesPath = solution.moves;
                         }
                     }
@@ -334,8 +334,8 @@ private:
                 }
 
             } else {
-                if (solution.moves.size() - 1 < minMoves) {
-                    minMoves = (int) solution.moves.size() - 1;
+                if (solution.moves.size() < minMoves) {
+                    minMoves = (int) solution.moves.size();
                     minMovesPath = solution.moves;
                     return;
                 }
@@ -396,7 +396,7 @@ void sendEnding(int& processCount, int *buffer, int &position) {
 }
 
 void sendInitDataToSlaves(deque<Solution>& queueSolutions, int& processCount, Game& game, int *buffer, int &position) {
-    cout << "---Master--- there are " << processCount << " processes " << endl;
+    // cout<< "---Master--- there are " << processCount << " processes " << endl;
     // pocatecni reseni
     Solution solution;
     solution.queenPosition = game.queen;
@@ -417,7 +417,7 @@ void sendInitDataToSlaves(deque<Solution>& queueSolutions, int& processCount, Ga
         prepareDataToSend(solution, game, buffer, position);
         MPI_Send(buffer, position, MPI_PACKED, i, TAG_NEW_WORK, MPI_COMM_WORLD);
 
-        cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
+        // cout<< "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
     }
 }
 
@@ -431,9 +431,9 @@ void receiveData(int &minMoves, int &queenX, int &queenY, vector<Move> &moves, v
     MPI_Unpack(buffer, BUFFER_LENGTH, &position, &movesCount, 1, MPI_INT, MPI_COMM_WORLD);
 
 
-    cout << "min moves: " << minMoves << endl;
-    cout << "receaving solution: " << queenX << ", " << queenY << endl;
-    cout << "moves count: " << movesCount << endl;
+    // cout<< "min moves: " << minMoves << endl;
+    // cout<< "receaving solution: " << queenX << ", " << queenY << endl;
+    // cout<< "moves count: " << movesCount << endl;
 
     int currentX, currentY, currentIsBlack;
 
@@ -441,7 +441,7 @@ void receiveData(int &minMoves, int &queenX, int &queenY, vector<Move> &moves, v
         MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentX, 1, MPI_INT, MPI_COMM_WORLD);
         MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentY, 1, MPI_INT, MPI_COMM_WORLD);
         MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentIsBlack, 1, MPI_INT, MPI_COMM_WORLD);
-        cout << "current: " << currentX << "," << currentY << "," << currentIsBlack << endl;
+        // cout<< "current: " << currentX << "," << currentY << "," << currentIsBlack << endl;
 
         if(currentIsBlack) {
             Move black(currentX, currentY);
@@ -460,7 +460,12 @@ void processResults(deque<Solution>& queueSolutions, Game &game, int& processCou
     // prijeti reseni
     while (!queueSolutions.empty() || (working > 0)) {
         MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
-        cout << "result: " << result << " queue size: " << queueSolutions.size() << endl;
+        // cout<< "result: " << result << " queue size: " << queueSolutions.size() << endl;
+
+        // uloz nejlepsi resut
+        if(result < game.minMoves) {
+            game.minMoves = result;
+        }
 
 
         if(!queueSolutions.empty()) {
@@ -470,7 +475,7 @@ void processResults(deque<Solution>& queueSolutions, Game &game, int& processCou
             prepareDataToSend(solution, game, buffer, position);
             MPI_Send(buffer, position, MPI_PACKED, status.MPI_SOURCE, TAG_NEW_WORK, MPI_COMM_WORLD);
             position = 0;
-            cout << "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
+            // cout<< "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
 
         } else {
             working--;
@@ -493,13 +498,15 @@ int main(int argc, char **argv) {
     /* find out number of processes */
     MPI_Comm_size(MPI_COMM_WORLD, &p);
 
-    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna01.txt");
+    ifstream file("/home/samik/CLionProjects/MI-PDP-semestral/data/kralovna04.txt");
 
     Game game;
     game.readInfo(file);
     game.readData(file);
 
     if (my_rank == 0) {
+        auto start = chrono::system_clock::now();
+
         // fronta reseni
         deque<Solution> queueSolutions;
 
@@ -511,8 +518,15 @@ int main(int argc, char **argv) {
 
         // posli vsem vlaknum info o ukonceni
         sendEnding(p, buffer, position);
+
+        // nejlepsi reseni
+        cout << game.minMoves << endl;
+
+        auto end = chrono::system_clock::now();
+        auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
+        cout << elapsed / 1000.0 << " seconds" << endl;
     } else {
-        cout << "---Slave--- " << my_rank << endl;
+        // cout<< "---Slave--- " << my_rank << endl;
         bool isAlive = true;
 
         while(isAlive) {
@@ -533,8 +547,13 @@ int main(int argc, char **argv) {
 
                 // vypocet reseni
                 game.findBestSolutionTaskParallel(deadBlackList, moves);
+                cout << "minMoves: " << game.minMovesPath.size();
+                for (auto &move : game.minMovesPath) {
+                    cout<< "(" << move.x << "," << move.y << ")";
+                }
+                cout << endl;
 
-                // odeslani reseni;
+                // odeslani reseni
                 MPI_Send(&game.minMoves, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
             } else if (status.MPI_TAG == TAG_END){
                 isAlive = false;
@@ -544,7 +563,7 @@ int main(int argc, char **argv) {
 
     /* shut down MPI */
     MPI_Finalize();
-    cout << "---Ended--- " << my_rank << endl;
+    // cout<< "---Ended--- " << my_rank << endl;
 
     return 0;
 }
