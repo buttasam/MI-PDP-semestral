@@ -459,12 +459,28 @@ void processResults(deque<Solution>& queueSolutions, Game &game, int& processCou
     int working = processCount - 1;
     // prijeti reseni
     while (!queueSolutions.empty() || (working > 0)) {
-        MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
-        // cout<< "result: " << result << " queue size: " << queueSolutions.size() << endl;
+        MPI_Recv(buffer, BUFFER_LENGTH, MPI_PACKED, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
+
+        position = 0;
+        MPI_Unpack(buffer, BUFFER_LENGTH, &position, &result, 1, MPI_INT, MPI_COMM_WORLD);
+
+        int currentX, currentY, currentIsBlack;
+
+        vector<Move> moves;
+        for (int i = 0; i < result; i++) {
+            MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentX, 1, MPI_INT, MPI_COMM_WORLD);
+            MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentY, 1, MPI_INT, MPI_COMM_WORLD);
+            MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentIsBlack, 1, MPI_INT, MPI_COMM_WORLD);
+
+            Move m(currentX, currentY);
+            m.isBlack = currentIsBlack;
+            moves.push_back(m);
+        }
 
         // uloz nejlepsi resut
         if(result < game.minMoves) {
             game.minMoves = result;
+            game.minMovesPath = moves;
         }
 
 
@@ -520,7 +536,11 @@ int main(int argc, char **argv) {
         sendEnding(p, buffer, position);
 
         // nejlepsi reseni
-        cout << game.minMoves << endl;
+        cout << game.minMoves;
+        for (auto &move : game.minMovesPath) {
+            cout<< "(" << move.x << "," << move.y << ")";
+        }
+        cout << endl;
 
         auto end = chrono::system_clock::now();
         auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
@@ -547,14 +567,28 @@ int main(int argc, char **argv) {
 
                 // vypocet reseni
                 game.findBestSolutionTaskParallel(deadBlackList, moves);
-                cout << "minMoves: " << game.minMovesPath.size();
+                int result = game.minMovesPath.size();
+                /*
+                cout << "minMoves: " << result;
                 for (auto &move : game.minMovesPath) {
                     cout<< "(" << move.x << "," << move.y << ")";
                 }
                 cout << endl;
+                */
 
                 // odeslani reseni
-                MPI_Send(&game.minMoves, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
+                position = 0;
+                // velikost moves
+                MPI_Pack(&result, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
+
+                // deadBlack list
+                for (int i = 0; i < game.minMovesPath.size(); i++) {
+                    MPI_Pack(&game.minMovesPath[i].x, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
+                    MPI_Pack(&game.minMovesPath[i].y, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
+                    MPI_Pack(&game.minMovesPath[i].isBlack, 1, MPI_INT, buffer, BUFFER_LENGTH, &position, MPI_COMM_WORLD);
+                }
+
+                MPI_Send(buffer, position, MPI_PACKED, 0, TAG_RESULT, MPI_COMM_WORLD);
             } else if (status.MPI_TAG == TAG_END){
                 isAlive = false;
             }
