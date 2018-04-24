@@ -165,14 +165,12 @@ public:
     }
 
 
-    void findBestSolutionTaskParallel() {
+    void findBestSolutionTaskParallel(vector<Move> &deadBlackList, vector<Move> &moves) {
 
         #pragma omp parallel
         {
             #pragma omp single
             {
-                vector<Move> deadBlackList;
-                vector<Move> moves;
                 findSolutionTaskParallel(queen, deadBlackList, moves);
             }
         }
@@ -263,7 +261,7 @@ private:
             // muze byt lepsi?
             if ((moves.size() - 1 < minMoves)) {
                 // nastav kritickou
-                #pragma omp critical
+#pragma omp critical
                 {
                     // znovu zkontroluj
                     if ((moves.size() - 1 < minMoves)) {
@@ -283,7 +281,7 @@ private:
         // aplikuj rekurzi na vsechny mozne tahy
         for (auto move : availableMovesList) {
             if (moves.size() < 2) {
-                #pragma omp task
+#pragma omp task
                 {
                     findSolutionTaskParallel(move, deadBlackList, moves);
                 }
@@ -423,6 +421,37 @@ void sendInitDataToSlaves(deque<Solution>& queueSolutions, int& processCount, Ga
     }
 }
 
+void receiveData(int &minMoves, int &queenX, int &queenY, vector<Move> &moves, vector<Move> &deadBlackList, int * buffer, int &position) {
+    position = 0;
+    int movesCount;
+
+    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &minMoves, 1, MPI_INT, MPI_COMM_WORLD);
+    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenX, 1, MPI_INT, MPI_COMM_WORLD);
+    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenY, 1, MPI_INT, MPI_COMM_WORLD);
+    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &movesCount, 1, MPI_INT, MPI_COMM_WORLD);
+
+
+    cout << "min moves: " << minMoves << endl;
+    cout << "receaving solution: " << queenX << ", " << queenY << endl;
+    cout << "moves count: " << movesCount << endl;
+
+    int currentX, currentY, currentIsBlack;
+
+    for (int i = 0; i < movesCount; i++) {
+        MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentX, 1, MPI_INT, MPI_COMM_WORLD);
+        MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentY, 1, MPI_INT, MPI_COMM_WORLD);
+        MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentIsBlack, 1, MPI_INT, MPI_COMM_WORLD);
+        cout << "current: " << currentX << "," << currentY << "," << currentIsBlack << endl;
+
+        if(currentIsBlack) {
+            Move black(currentX, currentY);
+            deadBlackList.push_back(black);
+        }
+
+        Move m(currentX, currentY);
+        moves.push_back(m);
+    }
+}
 
 void processResults(deque<Solution>& queueSolutions, Game &game, int& processCount, int *buffer, int &position) {
     MPI_Status status;
@@ -484,49 +513,26 @@ int main(int argc, char **argv) {
         sendEnding(p, buffer, position);
     } else {
         cout << "---Slave--- " << my_rank << endl;
-        int minMoves, currentMove, queenX, queenY, movesCount;
         bool isAlive = true;
 
         while(isAlive) {
             MPI_Recv(buffer, BUFFER_LENGTH, MPI_PACKED, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
             if(status.MPI_TAG == TAG_NEW_WORK) {
-                position = 0;
-
-                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &minMoves, 1, MPI_INT, MPI_COMM_WORLD);
-                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenX, 1, MPI_INT, MPI_COMM_WORLD);
-                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &queenY, 1, MPI_INT, MPI_COMM_WORLD);
-                MPI_Unpack(buffer, BUFFER_LENGTH, &position, &movesCount, 1, MPI_INT, MPI_COMM_WORLD);
+                vector<Move> moves;
+                vector<Move> deadBlackList;
+                int minMoves, queenX, queenY;
+                // ziskani hodnot
+                receiveData(minMoves, queenX, queenY, moves, deadBlackList, buffer, position);
 
                 // nastaveni hodnot
                 game.queen.x = queenX;
                 game.queen.y = queenY;
                 game.minMoves = minMoves;
 
-                cout << "min moves: " << minMoves << endl;
-                cout << "receaving solution: " << game.queen.x << ", " << game.queen.y << endl;
-                cout << "moves count: " << movesCount << endl;
-
-                int currentX, currentY, currentIsBlack;
-                vector<Move> moves;
-                vector<Move> deadBlackList;
-                for (int i = 0; i < movesCount; i++) {
-                    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentX, 1, MPI_INT, MPI_COMM_WORLD);
-                    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentY, 1, MPI_INT, MPI_COMM_WORLD);
-                    MPI_Unpack(buffer, BUFFER_LENGTH, &position, &currentIsBlack, 1, MPI_INT, MPI_COMM_WORLD);
-                    cout << "current: " << currentX << "," << currentY << "," << currentIsBlack << endl;
-
-                    if(currentIsBlack) {
-                        Move black(currentX, currentY);
-                        deadBlackList.push_back(black);
-                    }
-
-                    Move m(currentX, currentY);
-                    moves.push_back(m);
-                }
 
                 // vypocet reseni
-                game.findBestSolutionTaskParallel();
+                game.findBestSolutionTaskParallel(deadBlackList, moves);
 
                 // odeslani reseni;
                 MPI_Send(&game.minMoves, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
