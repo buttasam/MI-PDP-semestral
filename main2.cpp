@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <chrono>
 
 using namespace std;
 
@@ -8,7 +9,8 @@ const int MAX_SIZE = 20;
 
 class Move {
 public:
-    Move() {}
+    Move() {
+    }
 
     Move(int x, int y) {
         this->x = x;
@@ -26,7 +28,7 @@ public:
     Move queen;
     char desk[MAX_SIZE][MAX_SIZE];
 
-    // reseni
+// reseni
     int minMoves;
     vector<Move> minMovesPath;
 
@@ -144,21 +146,26 @@ public:
 
 
     void findBestSolution() {
-        clock_t t;
-        t = clock();
+        auto start = chrono::system_clock::now();
 
-        vector<Move> deadBlackList;
-        vector<Move> moves;
-        findSolution(queen, deadBlackList, moves);
+        #pragma omp parallel
+        {
+            #pragma omp single
+            {
+                vector<Move> deadBlackList;
+                vector<Move> moves;
+                findSolution(queen, deadBlackList, moves);
+            }
+        }
 
-        t = clock() - t;
-        cout << "time: " << t << " miliseconds" << endl;
-        cout << "time: " << t * 1.0 / CLOCKS_PER_SEC << " seconds" << endl;
+        auto end = chrono::system_clock::now();
+        auto elapsed = chrono::duration_cast<chrono::milliseconds>(end - start).count();
+        cout << elapsed / 1000.0 << " seconds"<< endl;
 
         cout << minMoves << endl;
         for (auto &move : minMovesPath) {
             cout << "(" << move.x << "," << move.y << ")";
-            if (move.printStar) cout << "*";
+            if(move.printStar) cout << "*";
         }
         cout << endl;
     }
@@ -186,13 +193,25 @@ private:
         // pridej tah
         moves.push_back(queen);
 
-        //printMoves(moves, deadBlackList);
+        // printMoves(moves, deadBlackList);
 
         // nalezene reseni?
-        if ((deadBlackList.size() == blackCount) && (moves.size() - 1 < minMoves)) {
-            minMoves = (int) moves.size() - 1;
-            minMovesPath = moves;
-            return;
+        if ((deadBlackList.size() == blackCount)) {
+
+            // muze byt lepsi?
+            if((moves.size() - 1 < minMoves)) {
+                // nastav kritickou
+                #pragma omp critical
+                {
+                    // znovu zkontroluj
+                    if((moves.size() - 1 < minMoves)) {
+                        // nastav znovu kritickou sekci
+                        minMoves = (int) moves.size() - 1;
+                        minMovesPath = moves;
+                    }
+                }
+                return;
+            }
         }
 
         // najdi vsechny mozne tahy
@@ -200,14 +219,20 @@ private:
         availableMoves(availableMovesList, queen, deadBlackList);
 
         // aplikuj rekurzi na vsechny mozne tahy
-        for (auto &move : availableMovesList) {
-            findSolution(move, deadBlackList, moves);
+        for (auto move : availableMovesList) {
+            if(moves.size() < 2) {
+                #pragma omp task
+                {
+                    findSolution(move, deadBlackList, moves);
+                }
+            } else {
+                findSolution(move, deadBlackList, moves);
+            }
         }
     }
 };
 
 int main(int argc, char *argv[]) {
-
     for (int i = 1; i < argc; i++) {
         ifstream file(argv[i]);
 
@@ -216,10 +241,8 @@ int main(int argc, char *argv[]) {
         game.readInfo(file);
         game.readData(file);
 
-        //game.printData();
+        // game.printData();
         game.findBestSolution();
     }
-
-
     return 0;
 }
