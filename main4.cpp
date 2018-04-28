@@ -8,7 +8,7 @@
 #include <vector>
 #include <stdio.h>
 
-#define BUFFER_LENGTH 100
+#define BUFFER_LENGTH 1000
 #define QUEUE_SIZE 20
 #define TAG_NEW_WORK 1 // nova prace
 #define TAG_RESULT 2 // odeslane reseni
@@ -417,7 +417,7 @@ void sendInitDataToSlaves(deque<Solution> &queueSolutions, int &processCount, Ga
         prepareDataToSend(solution, game, buffer, position);
         MPI_Send(buffer, position, MPI_PACKED, i, TAG_NEW_WORK, MPI_COMM_WORLD);
 
-        // cout<< "sending solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
+        // cout<< "sending init solution: " << solution.queenPosition.x << ", " << solution.queenPosition.y << endl;
     }
 }
 
@@ -537,9 +537,12 @@ int main(int argc, char **argv) {
             sendEnding(p, buffer, position);
 
             // nejlepsi reseni
-            cout << game.minMoves;
+            cout << game.minMoves << endl;
             for (auto &move : game.minMovesPath) {
                 cout << "(" << move.x << "," << move.y << ")";
+                if(move.isBlack) {
+                    cout << "*";
+                }
             }
             cout << endl;
 
